@@ -57,6 +57,25 @@ jobs:
         with:
           name: windows-release-assets
           path: dist
+      - name: Preflight release notes
+        run: |
+          VERSION_NOTES_PATH="docs/release-notes/${GITHUB_REF_NAME}.md"
+
+          if [[ -f "${VERSION_NOTES_PATH}" ]]; then
+            echo "Using version-specific release notes: ${VERSION_NOTES_PATH}"
+            echo "RELEASE_NOTES_FILE=${VERSION_NOTES_PATH}" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [[ -f "CHANGELOG.md" ]]; then
+            echo "Version notes not found at ${VERSION_NOTES_PATH}. Falling back to CHANGELOG.md"
+            echo "RELEASE_NOTES_FILE=CHANGELOG.md" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "ERROR: release notes file '${VERSION_NOTES_PATH}' not found and fallback file 'CHANGELOG.md' is missing." >&2
+          echo "Please add docs/release-notes/${GITHUB_REF_NAME}.md or restore CHANGELOG.md before running release." >&2
+          exit 1
       - name: Publish GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,5 +84,5 @@ jobs:
             dist/TerraTesting-win.zip \
             dist/checksums.txt \
             --title "${GITHUB_REF_NAME}" \
-            --notes-file docs/release-notes/v1.0.0.md \
+            --notes-file "${RELEASE_NOTES_FILE}" \
             --verify-tag

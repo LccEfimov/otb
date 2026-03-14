@@ -87,11 +87,26 @@ python -m terra_testing
 ruff check .
 ```
 
+### Структура release notes
+Workflow публикации ожидает структуру:
+- `docs/release-notes/<tag>.md` — notes для конкретного тега, например `docs/release-notes/v1.0.0.md`;
+- `CHANGELOG.md` — fallback, если файл для тега отсутствует.
+
+Если отсутствуют и `docs/release-notes/<tag>.md`, и `CHANGELOG.md`, job публикации аварийно завершится с понятной ошибкой на preflight-шаге до `gh release create`.
+
+### Процедура релиза
 ```bash
 python scripts/build_windows.py
 git tag -a v1.0.0 -m "Release v1.0.0"
 git push origin v1.0.0
-# draft (recommended)
+```
+
+При запуске `.github/workflows/release.yml` notes выбираются автоматически:
+1. `docs/release-notes/${GITHUB_REF_NAME}.md`;
+2. fallback на `CHANGELOG.md`.
+
+Для ручного draft-релиза можно использовать:
+```bash
 gh release create v1.0.0 dist/TerraTesting-win.zip dist/checksums.txt --title "v1.0.0" --notes-file docs/release-notes/v1.0.0.md --draft
 ```
 
