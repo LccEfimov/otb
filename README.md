@@ -64,7 +64,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -U pip
 pip install -e .[dev]
-copy .env.example .env
+cp .env.example .env
 alembic upgrade head
 python scripts/seed.py
 python -m terra_testing
@@ -72,7 +72,11 @@ python -m terra_testing
 
 ## Релиз
 ```bash
+python scripts/build_windows.py
 git tag -a v1.0.0 -m "Release v1.0.0"
 git push origin v1.0.0
-gh release create v1.0.0 dist/TerraTesting-win.zip dist/checksums.txt --title "v1.0.0" --notes-file docs/release-notes/v1.0.0.md
+# draft (recommended)
+gh release create v1.0.0 dist/TerraTesting-win.zip dist/checksums.txt --title "v1.0.0" --notes-file docs/release-notes/v1.0.0.md --draft
 ```
+
+Скрипт `scripts/build_windows.py` формирует `dist/TerraTesting-win.zip` и `dist/checksums.txt`.

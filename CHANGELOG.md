@@ -56,3 +56,10 @@ All notable changes to this project will be documented in this file.
 - sync queue model and repository for offline-first retry tracking
 - audit log export to PDF and Excel
 - shared access helpers for authenticated/user/admin page guards
+
+### Release readiness updates
+- added `.env.example` with full environment configuration template
+- added CI and release GitHub workflows (`.github/workflows/ci.yml`, `.github/workflows/release.yml`)
+- added `scripts/release_bundle.py` to build `dist/TerraTesting-win.zip` and SHA-256 checksums
+- updated `scripts/build_windows.py` to always produce release zip/checksums
+- documented draft-release publishing flow in README and release notes

@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import select
 
 from terra_testing.db.init_db import init_db
 from terra_testing.db.session import get_local_session
