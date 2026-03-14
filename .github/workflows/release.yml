@@ -7,17 +7,25 @@ on:
       - "v*"
 
 permissions:
+  actions: read
+  checks: read
   contents: write
 
 jobs:
   ci-gate:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
     steps:
       - name: Verify CI checks are successful for tag commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Keep fail-fast gating via check-runs API for ${{ github.sha }}.
+          # This requires `checks: read` (and `actions: read`) permissions.
           gh api repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs \
             --jq '[.check_runs[] | select(.name == "test" or .name == "lint") | .conclusion] as $checks
                   | ($checks | length == 2) and all($checks[]; . == "success")' \
