@@ -35,3 +35,43 @@ def test_login_bad_password():
     result = AuthService().login("admin", "wrong")
     assert result["success"] is False
     assert result["error"] == "Неверный пароль"
+
+
+def test_login_skips_sync_when_flag_disabled(monkeypatch):
+    init_db()
+    role = _prepare_role("admin")
+    UserService().create_user("admin", "Admin", "Admin123!", role.id)
+
+    called = {"value": False}
+
+    def _raise_if_called(user_id: int):
+        called["value"] = True
+        raise AssertionError("sync_after_login should not be called")
+
+    service = AuthService()
+    service.sync_service.settings.sync_after_login = False
+    monkeypatch.setattr(service.sync_service, "sync_after_login", _raise_if_called)
+
+    result = service.login("admin", "Admin123!")
+    assert result["success"] is True
+    assert called["value"] is False
+
+
+def test_login_calls_sync_when_flag_enabled(monkeypatch):
+    init_db()
+    role = _prepare_role("admin")
+    UserService().create_user("admin", "Admin", "Admin123!", role.id)
+
+    called = {"value": False}
+
+    def _mark_called(user_id: int):
+        called["value"] = True
+        return {"synced": 0, "failed": 0, "total": 0}
+
+    service = AuthService()
+    service.sync_service.settings.sync_after_login = True
+    monkeypatch.setattr(service.sync_service, "sync_after_login", _mark_called)
+
+    result = service.login("admin", "Admin123!")
+    assert result["success"] is True
+    assert called["value"] is True

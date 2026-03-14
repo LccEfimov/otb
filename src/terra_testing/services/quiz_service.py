@@ -98,8 +98,9 @@ class QuizService:
             **result_payload,
         )
         self.audit_service.log('quiz_completed', str(user_id), f'Завершён тест result_id={result.id}, status={result.status}, score={result.score_percent}')
-        try:
-            self.sync_service.sync_after_test_completion(result.id)
-        except Exception:
-            pass
+        if self.sync_service.settings.sync_after_test_completion:
+            try:
+                self.sync_service.sync_after_test_completion(result.id)
+            except Exception:
+                pass
         return result

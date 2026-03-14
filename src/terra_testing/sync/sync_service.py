@@ -20,8 +20,12 @@ class SyncService:
         self.sync_queue_repository = SyncQueueRepository()
         self.audit_service = AuditService()
 
-    def _can_sync(self) -> bool:
-        return self.settings.remote_sync_enabled and bool(self.settings.remote_db_url)
+    def _can_sync_for_event(self, *, enabled: bool) -> tuple[bool, str | None]:
+        if not enabled:
+            return False, "disabled_by_flag"
+        if not self.settings.remote_sync_enabled or not self.settings.remote_db_url:
+            return False, "disabled"
+        return True, None
 
     def _probe_remote(self) -> None:
         engine = get_remote_engine()
@@ -43,18 +47,20 @@ class SyncService:
         return True
 
     def sync_after_login(self, user_id: int) -> dict:
-        if not self._can_sync():
-            logger.info("Remote sync skipped after login: disabled")
-            return {"synced": 0, "failed": 0, "total": 0, "reason": "disabled"}
+        can_sync, reason = self._can_sync_for_event(enabled=self.settings.sync_after_login)
+        if not can_sync:
+            logger.info("Remote sync skipped after login: %s", reason)
+            return {"synced": 0, "failed": 0, "total": 0, "reason": reason}
         logger.info("Starting post-login sync for user_id=%s", user_id)
         self._probe_remote()
         return self.retry_pending_sync(actor=f"user:{user_id}", event_type="sync_retry_after_login")
 
     def sync_after_test_completion(self, result_id: int) -> dict:
         self.sync_queue_repository.enqueue_result(result_id)
-        if not self._can_sync():
-            logger.info("Remote sync skipped after test completion: disabled")
-            return {"synced": 0, "failed": 0, "total": 1, "reason": "disabled"}
+        can_sync, reason = self._can_sync_for_event(enabled=self.settings.sync_after_test_completion)
+        if not can_sync:
+            logger.info("Remote sync skipped after test completion: %s", reason)
+            return {"synced": 0, "failed": 0, "total": 1, "reason": reason}
 
         logger.info("Starting post-test sync for result_id=%s", result_id)
         try:

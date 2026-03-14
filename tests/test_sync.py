@@ -103,3 +103,60 @@ def test_retry_pending_sync_marks_rows_synced(monkeypatch):
     assert summary['synced'] == 1
     assert updated is not None
     assert updated.sync_state == 'synced'
+
+
+def test_sync_after_login_returns_disabled_by_flag(monkeypatch):
+    monkeypatch.setenv('REMOTE_SYNC_ENABLED', 'true')
+    monkeypatch.setenv('REMOTE_DB_URL', 'mysql+pymysql://user:pass@127.0.0.1:3306/db')
+    monkeypatch.setenv('SYNC_AFTER_LOGIN', 'false')
+    reset_settings_cache()
+    reset_engines()
+    init_db()
+
+    service = SyncService()
+    summary = service.sync_after_login(1)
+
+    assert summary == {'synced': 0, 'failed': 0, 'total': 0, 'reason': 'disabled_by_flag'}
+
+
+def test_sync_after_test_completion_returns_disabled_by_flag(monkeypatch):
+    monkeypatch.setenv('REMOTE_SYNC_ENABLED', 'true')
+    monkeypatch.setenv('REMOTE_DB_URL', 'mysql+pymysql://user:pass@127.0.0.1:3306/db')
+    monkeypatch.setenv('SYNC_AFTER_TEST_COMPLETION', 'false')
+    reset_settings_cache()
+    reset_engines()
+    init_db()
+
+    with get_local_session() as session:
+        role = Role(name='user')
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+    user = UserService().create_user('user01', 'User', 'User123!', role.id)
+
+    qservice = QuestionService()
+    category = qservice.create_category('Категория')
+    question = qservice.create_question(
+        category.id,
+        'Вопрос',
+        [
+            {'text': 'Да', 'is_correct': True},
+            {'text': 'Нет', 'is_correct': False},
+        ],
+    )
+
+    correct_answer = next(answer for answer in question.answers if answer.is_correct)
+    result = ResultRepository().create_result(
+        user_id=user.id,
+        assignment_id=None,
+        correct_answers=1,
+        total_questions=1,
+        score_percent=100,
+        status='passed',
+        answers=[{'question_id': question.id, 'selected_answer_id': correct_answer.id, 'is_correct': True}],
+    )
+
+    service = SyncService()
+    summary = service.sync_after_test_completion(result.id)
+
+    assert summary == {'synced': 0, 'failed': 0, 'total': 1, 'reason': 'disabled_by_flag'}
