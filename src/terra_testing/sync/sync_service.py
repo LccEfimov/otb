@@ -77,7 +77,15 @@ class SyncService:
             return {"synced": 0, "failed": 1, "total": 1, "error": str(exc)}
 
     def retry_result(self, result_id: int, *, actor: str = "admin") -> dict:
-        self.sync_queue_repository.enqueue_result(result_id)
+        retry_limit = self.settings.sync_retry_limit
+        queue_item = self.sync_queue_repository.enqueue_result(result_id)
+
+        if queue_item.retry_count >= retry_limit:
+            reason = "retry limit exceeded"
+            self.sync_queue_repository.mark_exhausted(queue_item.id, reason)
+            self.audit_service.log("sync_retry_result_exhausted", actor, f"Лимит повторов исчерпан для result #{result_id}")
+            return {"synced": 0, "failed": 1, "total": 1, "error": reason}
+
         try:
             self._sync_result(result_id)
             self.audit_service.log("sync_retry_result", actor, f"Повторная синхронизация result #{result_id} успешна")
@@ -87,15 +95,22 @@ class SyncService:
             queue_item = self.sync_queue_repository.get_by_result_id(result_id)
             if queue_item is not None:
                 self.sync_queue_repository.mark_failed(queue_item.id, str(exc))
+                if queue_item.retry_count + 1 >= retry_limit:
+                    self.sync_queue_repository.mark_exhausted(queue_item.id, "retry limit exceeded")
             self.audit_service.log("sync_retry_result_failed", actor, f"Ошибка повторной синхронизации result #{result_id}: {exc}")
             return {"synced": 0, "failed": 1, "total": 1, "error": str(exc)}
 
     def retry_pending_sync(self, *, actor: str = "admin", event_type: str = "sync_retry_batch") -> dict:
-        items = self.sync_queue_repository.list_pending_like()
+        items = self.sync_queue_repository.list_retryable_pending_like(retry_limit=self.settings.sync_retry_limit)
         synced = 0
         failed = 0
 
         for item in items:
+            if item.retry_count >= self.settings.sync_retry_limit:
+                self.sync_queue_repository.mark_exhausted(item.id, "retry limit exceeded")
+                failed += 1
+                continue
+
             try:
                 if item.entity_type == "test_result":
                     self._sync_result(item.entity_id)
@@ -105,6 +120,8 @@ class SyncService:
                     synced += 1
             except Exception as exc:
                 self.sync_queue_repository.mark_failed(item.id, str(exc))
+                if item.retry_count + 1 >= self.settings.sync_retry_limit:
+                    self.sync_queue_repository.mark_exhausted(item.id, "retry limit exceeded")
                 if item.entity_type == "test_result":
                     self.sync_repository.mark_failed(item.entity_id, str(exc))
                 failed += 1

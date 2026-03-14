@@ -57,6 +57,18 @@ class SyncQueueRepository:
             )
             return list(session.execute(stmt).scalars().all())
 
+    def list_retryable_pending_like(self, *, retry_limit: int) -> list[SyncQueueItem]:
+        with get_local_session() as session:
+            stmt = (
+                select(SyncQueueItem)
+                .where(
+                    SyncQueueItem.status.in_(["pending", "failed"]),
+                    SyncQueueItem.retry_count < retry_limit,
+                )
+                .order_by(SyncQueueItem.created_at.desc(), SyncQueueItem.id.desc())
+            )
+            return list(session.execute(stmt).scalars().all())
+
     def mark_processing(self, item_id: int) -> None:
         with get_local_session() as session:
             item = session.get(SyncQueueItem, item_id)
@@ -85,6 +97,16 @@ class SyncQueueRepository:
             item.last_error = error[:1000]
             item.last_attempt_at = utcnow()
             item.retry_count += 1
+            session.commit()
+
+    def mark_exhausted(self, item_id: int, reason: str) -> None:
+        with get_local_session() as session:
+            item = session.get(SyncQueueItem, item_id)
+            if item is None:
+                return
+            item.status = "exhausted"
+            item.last_error = reason[:1000]
+            item.last_attempt_at = utcnow()
             session.commit()
 
     def count_by_status(self, status: str) -> int:
