@@ -31,5 +31,5 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e '.[dev]'
-      - name: Run Ruff (non-blocking baseline)
-        run: ruff check . || true
+      - name: Run Ruff
+        run: ruff check .
