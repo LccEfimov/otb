@@ -61,5 +61,5 @@ All notable changes to this project will be documented in this file.
 - added `.env.example` with full environment configuration template
 - added CI and release GitHub workflows (`.github/workflows/ci.yml`, `.github/workflows/release.yml`)
 - added `scripts/release_bundle.py` to build `dist/TerraTesting-win.zip` and SHA-256 checksums
-- updated `scripts/build_windows.py` to always produce release zip/checksums
+- обновлено `scripts/build_windows.py чтобы всегда производить выпуск zip/checksums
 - documented draft-release publishing flow in README and release notes

@@ -64,7 +64,9 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -U pip
 pip install -e .[dev]
-cp .env.example .env
+# Windows (CMD): copy .env.example .env
+# PowerShell: Copy-Item .env.example .env
+# Linux/macOS: cp .env.example .env
 alembic upgrade head
 python scripts/seed.py
 python -m terra_testing
