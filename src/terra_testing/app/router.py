@@ -73,8 +73,14 @@ def fallback_route_for_state(state: SessionState, requested_route: str) -> str:
 def configure_routing(page: ft.Page) -> None:
     def route_change(route: ft.RouteChangeEvent) -> None:
         state = get_session_state(page)
-        requested_route = page.route if page.route in ROUTES else '/login'
-        effective_route = requested_route if route_is_allowed(requested_route, state) else fallback_route_for_state(state, requested_route)
+        raw_route = page.route
+
+        if raw_route in ROUTES:
+            requested_route = raw_route
+            effective_route = requested_route if route_is_allowed(requested_route, state) else fallback_route_for_state(state, requested_route)
+        else:
+            requested_route = raw_route
+            effective_route = fallback_route_for_state(state, raw_route)
 
         if effective_route != page.route:
             page.go(effective_route)
