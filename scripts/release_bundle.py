@@ -13,23 +13,6 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def resolve_package_path(dist_dir: Path, package_path: Path | None = None) -> Path:
-    if package_path is not None:
-        return package_path
-
-    candidates = [
-        dist_dir / "TerraTesting.exe",
-        dist_dir / "TerraTesting",
-        dist_dir / "TerraTesting.app",
-    ]
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-
-    return dist_dir / "TerraTesting"
-
-
 def bundle_windows_artifact(
     *,
     package_path: Path | None = None,
@@ -39,24 +22,24 @@ def bundle_windows_artifact(
 ) -> tuple[Path, Path]:
     dist_dir.mkdir(parents=True, exist_ok=True)
     zip_path = dist_dir / zip_name
-    selected_package_path = resolve_package_path(dist_dir=dist_dir, package_path=package_path)
+
+    package_path = package_path or (dist_dir / "TerraTesting")
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        if selected_package_path.exists():
-            if selected_package_path.is_file():
-                archive.write(selected_package_path, selected_package_path.name)
+        if package_path.exists():
+            if package_path.is_file():
+                archive.write(package_path, package_path.name)
             else:
-                for item in sorted(selected_package_path.rglob("*")):
+                for item in sorted(package_path.rglob("*")):
                     if item.is_file():
-                        archive.write(item, item.relative_to(selected_package_path.parent))
+                        archive.write(item, item.relative_to(package_path.parent))
         elif build_dir.exists():
             for item in sorted(build_dir.rglob("*")):
                 if item.is_file():
                     archive.write(item, item.relative_to(build_dir))
         else:
             raise FileNotFoundError(
-                "Neither package path "
-                f"'{selected_package_path}' nor build directory '{build_dir}' exists"
+                f"Neither package path '{package_path}' nor build directory '{build_dir}' exists"
             )
 
     checksums_path = dist_dir / "checksums.txt"
