@@ -110,3 +110,55 @@ def test_assignment_attempt_limit_is_enforced():
         assert "лимит попыток" in str(exc)
     else:
         raise AssertionError("Expected ValueError for attempt limit")
+
+
+def test_complete_quiz_skips_sync_when_flag_disabled(monkeypatch):
+    init_db()
+    user = _create_user_with_role()
+    questions = _seed_questions()
+    service = QuizService()
+
+    called = {"value": False}
+
+    def _raise_if_called(result_id: int):
+        called["value"] = True
+        raise AssertionError("sync_after_test_completion should not be called")
+
+    service.sync_service.settings.sync_after_test_completion = False
+    monkeypatch.setattr(service.sync_service, "sync_after_test_completion", _raise_if_called)
+
+    selected_answer_ids = {question.id: question.answers[0].id for question in questions}
+    service.complete_quiz_from_selection(
+        user_id=user.id,
+        questions=questions,
+        selected_answer_ids=selected_answer_ids,
+        assignment_id=None,
+    )
+
+    assert called["value"] is False
+
+
+def test_complete_quiz_calls_sync_when_flag_enabled(monkeypatch):
+    init_db()
+    user = _create_user_with_role()
+    questions = _seed_questions()
+    service = QuizService()
+
+    called = {"value": False}
+
+    def _mark_called(result_id: int):
+        called["value"] = True
+        return {"synced": 0, "failed": 0, "total": 1}
+
+    service.sync_service.settings.sync_after_test_completion = True
+    monkeypatch.setattr(service.sync_service, "sync_after_test_completion", _mark_called)
+
+    selected_answer_ids = {question.id: question.answers[0].id for question in questions}
+    service.complete_quiz_from_selection(
+        user_id=user.id,
+        questions=questions,
+        selected_answer_ids=selected_answer_ids,
+        assignment_id=None,
+    )
+
+    assert called["value"] is True

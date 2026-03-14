@@ -32,10 +32,11 @@ class AuthService:
 
         self.audit_service.log('login_success', user.username, f'Успешный вход пользователя {user.full_name}')
 
-        try:
-            self.sync_service.sync_after_login(user.id)
-        except Exception as exc:
-            logger.warning('Post-login sync failed for user_id=%s: %s', user.id, exc)
+        if self.sync_service.settings.sync_after_login:
+            try:
+                self.sync_service.sync_after_login(user.id)
+            except Exception as exc:
+                logger.warning('Post-login sync failed for user_id=%s: %s', user.id, exc)
 
         return {
             'success': True,
