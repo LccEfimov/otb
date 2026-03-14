@@ -42,7 +42,7 @@ def test_retry_single_result_marks_it_synced(monkeypatch):
     init_db()
     result = _seed_result()
     service = SyncService()
-    monkeypatch.setattr(service, "_probe_remote", lambda: None)
+    monkeypatch.setattr(service.sync_repository, "upsert_result_to_remote", lambda _result: None)
     summary = service.retry_result(result.id)
     updated = ResultRepository().get_result(result.id)
     assert summary["synced"] == 1
@@ -54,7 +54,7 @@ def test_retry_single_result_creates_audit_event(monkeypatch):
     init_db()
     result = _seed_result()
     service = SyncService()
-    monkeypatch.setattr(service, "_probe_remote", lambda: None)
+    monkeypatch.setattr(service.sync_repository, "upsert_result_to_remote", lambda _result: None)
     service.retry_result(result.id, actor="admin")
     logs = AuditRepository().list_recent(limit=10)
     assert any(log.event_type == "sync_retry_result" for log in logs)
@@ -70,18 +70,18 @@ def test_retry_single_result_respects_retry_limit(monkeypatch):
     service.sync_queue_repository.mark_failed(queue_item.id, "network error")
     service.sync_queue_repository.mark_failed(queue_item.id, "network error")
 
-    called = {"probe": False}
+    called = {"upsert": False}
 
-    def _probe_remote():
-        called["probe"] = True
+    def _upsert(_result):
+        called["upsert"] = True
 
-    monkeypatch.setattr(service, "_probe_remote", _probe_remote)
+    monkeypatch.setattr(service.sync_repository, "upsert_result_to_remote", _upsert)
 
     summary = service.retry_result(result.id, actor="admin")
     updated_item = service.sync_queue_repository.get_by_result_id(result.id)
 
     assert summary == {"synced": 0, "failed": 1, "total": 1, "error": "retry limit exceeded"}
-    assert called["probe"] is False
+    assert called["upsert"] is False
     assert updated_item is not None
     assert updated_item.status == "exhausted"
     assert updated_item.retry_count == 2

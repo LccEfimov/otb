@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from terra_testing.config.settings import reset_settings_cache
 from terra_testing.db.init_db import init_db
-from terra_testing.db.session import get_local_session
+from terra_testing.db.session import get_local_session, reset_engines
 from terra_testing.models.role import Role
 from terra_testing.repositories.result_repository import ResultRepository
 from terra_testing.repositories.sync_queue_repository import SyncQueueRepository
@@ -52,9 +53,46 @@ def test_retry_result_updates_sync_queue(monkeypatch):
     init_db()
     result = _seed_result()
     service = SyncService()
-    monkeypatch.setattr(service, "_probe_remote", lambda: None)
+    monkeypatch.setattr(service.sync_repository, "upsert_result_to_remote", lambda _result: None)
+
     summary = service.retry_result(result.id)
+
     item = SyncQueueRepository().get_by_result_id(result.id)
     assert summary["synced"] == 1
     assert item is not None
     assert item.status == "synced"
+
+
+def test_retry_after_failed_remote_sync_succeeds(monkeypatch):
+    monkeypatch.setenv("REMOTE_SYNC_ENABLED", "true")
+    monkeypatch.setenv("REMOTE_DB_URL", "mysql+pymysql://user:pass@127.0.0.1:3306/db")
+    reset_settings_cache()
+    reset_engines()
+    init_db()
+    result = _seed_result()
+    service = SyncService()
+
+    state = {"attempt": 0}
+
+    def _flaky_upsert(_result):
+        state["attempt"] += 1
+        if state["attempt"] == 1:
+            raise RuntimeError("temporary mysql error")
+
+    monkeypatch.setattr(service.sync_repository, "upsert_result_to_remote", _flaky_upsert)
+
+    first = service.sync_after_test_completion(result.id)
+    second = service.retry_result(result.id)
+
+    updated_result = ResultRepository().get_result(result.id)
+    item = SyncQueueRepository().get_by_result_id(result.id)
+
+    assert first["failed"] == 1
+    assert second["synced"] == 1
+    assert updated_result is not None
+    assert updated_result.sync_state == "synced"
+    assert updated_result.sync_error is None
+    assert item is not None
+    assert item.status == "synced"
+    assert item.retry_count == 1
+    assert item.last_error is None

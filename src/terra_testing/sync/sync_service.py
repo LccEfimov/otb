@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import text
-
 from terra_testing.config.settings import get_settings
-from terra_testing.db.session import get_remote_engine
 from terra_testing.repositories.sync_queue_repository import SyncQueueRepository
 from terra_testing.repositories.sync_repository import SyncRepository
 from terra_testing.services.audit_service import AuditService
@@ -27,19 +24,16 @@ class SyncService:
             return False, "disabled"
         return True, None
 
-    def _probe_remote(self) -> None:
-        engine = get_remote_engine()
-        if engine is None:
-            raise RuntimeError("Remote engine is not configured")
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-
     def _sync_result(self, result_id: int) -> bool:
         queue_item = self.sync_queue_repository.get_by_result_id(result_id)
         if queue_item is not None:
             self.sync_queue_repository.mark_processing(queue_item.id)
 
-        self._probe_remote()
+        local_result = self.sync_repository.get_result_for_remote(result_id)
+        if local_result is None:
+            raise RuntimeError(f"Local TestResult #{result_id} is not found")
+
+        self.sync_repository.upsert_result_to_remote(local_result)
 
         self.sync_repository.mark_synced(result_id)
         if queue_item is not None:
@@ -52,7 +46,6 @@ class SyncService:
             logger.info("Remote sync skipped after login: %s", reason)
             return {"synced": 0, "failed": 0, "total": 0, "reason": reason}
         logger.info("Starting post-login sync for user_id=%s", user_id)
-        self._probe_remote()
         return self.retry_pending_sync(actor=f"user:{user_id}", event_type="sync_retry_after_login")
 
     def sync_after_test_completion(self, result_id: int) -> dict:
