@@ -4,7 +4,7 @@ from datetime import datetime
 
 import flet as ft
 
-from terra_testing.app.access import require_authenticated
+from terra_testing.app.access import require_admin
 from terra_testing.components.app_shell import build_shell
 from terra_testing.repositories.result_repository import ResultRepository
 from terra_testing.repositories.user_repository import UserRepository
@@ -89,7 +89,7 @@ class ReportsPage:
         self.page.update()
 
     def build(self) -> ft.View:
-        denied = require_authenticated(self.page, "Отчёты", "/reports")
+        denied = require_admin(self.page, "Отчёты", "/reports")
         if denied is not None:
             return denied
 

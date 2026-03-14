@@ -15,7 +15,7 @@
 - Pass/fail calculation
 - Test history
 - Basic analytics
-- PDF and Excel reports
+- PDF and Excel reports (admin-only access)
 - Audit logging
 - Backup/export utilities
 - Automated testing
