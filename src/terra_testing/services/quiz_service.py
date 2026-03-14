@@ -10,6 +10,11 @@ from terra_testing.utils.time import utcnow
 
 
 class QuizService:
+    # Правило v1.0: назначение автоматически завершается только при исчерпании
+    # лимита попыток. Отдельные политики (например, "завершать при passed")
+    # должны быть явно добавлены как отдельное бизнес-правило.
+    ASSIGNMENT_COMPLETION_POLICY = 'attempts_exhausted_only'
+
     def __init__(self) -> None:
         self.settings = get_settings()
         self.question_repository = QuestionRepository()
@@ -80,7 +85,10 @@ class QuizService:
         answers = self.build_answer_payload(questions, selected_answer_ids)
         result = self.complete_quiz(user_id=user_id, assignment_id=assignment_id, answers=answers)
         if assignment_id is not None:
-            self.schedule_repository.mark_completed(assignment_id)
+            attempts = self.result_repository.count_attempts_for_assignment(user_id, assignment_id)
+            assignment = self.schedule_repository.get_assignment(assignment_id)
+            if assignment is not None and attempts >= assignment.max_attempts:
+                self.schedule_repository.mark_completed(assignment_id)
         return result
 
     def complete_quiz(self, *, user_id: int, assignment_id: int | None, answers: list[dict]):
