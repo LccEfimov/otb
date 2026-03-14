@@ -58,3 +58,31 @@ def test_retry_single_result_creates_audit_event(monkeypatch):
     service.retry_result(result.id, actor="admin")
     logs = AuditRepository().list_recent(limit=10)
     assert any(log.event_type == "sync_retry_result" for log in logs)
+
+
+def test_retry_single_result_respects_retry_limit(monkeypatch):
+    monkeypatch.setenv("SYNC_RETRY_LIMIT", "2")
+    init_db()
+    result = _seed_result()
+
+    service = SyncService()
+    queue_item = service.sync_queue_repository.enqueue_result(result.id)
+    service.sync_queue_repository.mark_failed(queue_item.id, "network error")
+    service.sync_queue_repository.mark_failed(queue_item.id, "network error")
+
+    called = {"probe": False}
+
+    def _probe_remote():
+        called["probe"] = True
+
+    monkeypatch.setattr(service, "_probe_remote", _probe_remote)
+
+    summary = service.retry_result(result.id, actor="admin")
+    updated_item = service.sync_queue_repository.get_by_result_id(result.id)
+
+    assert summary == {"synced": 0, "failed": 1, "total": 1, "error": "retry limit exceeded"}
+    assert called["probe"] is False
+    assert updated_item is not None
+    assert updated_item.status == "exhausted"
+    assert updated_item.retry_count == 2
+    assert updated_item.last_error == "retry limit exceeded"
