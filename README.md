@@ -82,6 +82,11 @@ python -m terra_testing
 ```
 
 ## Релиз
+Перед созданием release обязательно запустите линтер локально:
+```bash
+ruff check .
+```
+
 ```bash
 python scripts/build_windows.py
 git tag -a v1.0.0 -m "Release v1.0.0"
