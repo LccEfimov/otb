@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import select
 
 from terra_testing.db.init_db import init_db
 from terra_testing.db.session import get_local_session
@@ -14,10 +15,12 @@ from terra_testing.utils.time import utcnow
 
 def _create_user(username: str, role_name: str = 'user'):
     with get_local_session() as session:
-        role = Role(name=role_name)
-        session.add(role)
-        session.commit()
-        session.refresh(role)
+        role = session.scalar(select(Role).where(Role.name == role_name))
+        if role is None:
+            role = Role(name=role_name)
+            session.add(role)
+            session.commit()
+            session.refresh(role)
     return UserService().create_user(username, username, 'User123!', role.id)
 
 
