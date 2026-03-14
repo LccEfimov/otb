@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from terra_testing.config.settings import get_settings
 from terra_testing.repositories.question_repository import QuestionRepository
 from terra_testing.repositories.result_repository import ResultRepository
@@ -7,6 +9,9 @@ from terra_testing.repositories.schedule_repository import ScheduleRepository
 from terra_testing.services.audit_service import AuditService
 from terra_testing.sync.sync_service import SyncService
 from terra_testing.utils.time import utcnow
+
+
+logger = logging.getLogger(__name__)
 
 
 class QuizService:
@@ -109,6 +114,11 @@ class QuizService:
         if self.sync_service.settings.sync_after_test_completion:
             try:
                 self.sync_service.sync_after_test_completion(result.id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.exception('Не удалось выполнить sync после завершения теста result_id=%s', result.id)
+                self.audit_service.log(
+                    'sync_result_failed_deferred',
+                    str(user_id),
+                    f'Отложенная синхронизация результата result_id={result.id} завершилась ошибкой: {exc!r}',
+                )
         return result

@@ -180,6 +180,39 @@ def test_complete_quiz_skips_sync_when_flag_disabled(monkeypatch):
     assert called["value"] is False
 
 
+
+
+def test_complete_quiz_logs_audit_event_when_sync_fails(monkeypatch):
+    init_db()
+    user = _create_user_with_role()
+    questions = _seed_questions()
+    service = QuizService()
+
+    service.sync_service.settings.sync_after_test_completion = True
+
+    def _raise_sync_error(result_id: int):
+        raise RuntimeError("sync offline")
+
+    monkeypatch.setattr(service.sync_service, "sync_after_test_completion", _raise_sync_error)
+
+    selected_answer_ids = {question.id: question.answers[0].id for question in questions}
+    result = service.complete_quiz_from_selection(
+        user_id=user.id,
+        questions=questions,
+        selected_answer_ids=selected_answer_ids,
+        assignment_id=None,
+    )
+
+    assert result.id is not None
+
+    recent_events = service.audit_service.list_recent(limit=20)
+    deferred_sync_events = [event for event in recent_events if event.event_type == "sync_result_failed_deferred"]
+
+    assert deferred_sync_events
+    assert deferred_sync_events[0].actor == str(user.id)
+    assert f"result_id={result.id}" in deferred_sync_events[0].message
+    assert "RuntimeError" in deferred_sync_events[0].message
+
 def test_complete_quiz_calls_sync_when_flag_enabled(monkeypatch):
     init_db()
     user = _create_user_with_role()
