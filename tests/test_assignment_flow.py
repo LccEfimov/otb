@@ -14,10 +14,12 @@ from terra_testing.utils.time import utcnow
 
 def _create_user(username: str, role_name: str = 'user'):
     with get_local_session() as session:
-        role = Role(name=role_name)
-        session.add(role)
-        session.commit()
-        session.refresh(role)
+        role = session.query(Role).filter(Role.name == role_name).one_or_none()
+        if role is None:
+            role = Role(name=role_name)
+            session.add(role)
+            session.commit()
+            session.refresh(role)
     return UserService().create_user(username, username, 'User123!', role.id)
 
 
