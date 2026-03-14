@@ -112,6 +112,48 @@ def test_assignment_attempt_limit_is_enforced():
         raise AssertionError("Expected ValueError for attempt limit")
 
 
+def test_assignment_remains_active_until_all_attempts_are_used():
+    init_db()
+    user = _create_user_with_role()
+    questions = _seed_questions()
+    schedule_service = ScheduleService()
+    assignment = schedule_service.create_assignment(
+        user_id=user.id,
+        title="Проверка знаний",
+        questions_count=2,
+        max_attempts=2,
+        due_at=None,
+    )
+    service = QuizService()
+    selected_answer_ids = {question.id: question.answers[0].id for question in questions}
+
+    service.complete_quiz_from_selection(
+        user_id=user.id,
+        questions=questions,
+        selected_answer_ids=selected_answer_ids,
+        assignment_id=assignment.id,
+    )
+
+    assignment_after_first_attempt = schedule_service.repository.get_assignment(assignment.id)
+    assert assignment_after_first_attempt is not None
+    assert assignment_after_first_attempt.status == "assigned"
+
+    # Повторный старт разрешён, пока лимит попыток не исчерпан.
+    quiz_payload = service.start_quiz(user.id, assignment.id)
+    assert quiz_payload["assignment_id"] == assignment.id
+
+    service.complete_quiz_from_selection(
+        user_id=user.id,
+        questions=questions,
+        selected_answer_ids=selected_answer_ids,
+        assignment_id=assignment.id,
+    )
+
+    assignment_after_second_attempt = schedule_service.repository.get_assignment(assignment.id)
+    assert assignment_after_second_attempt is not None
+    assert assignment_after_second_attempt.status == "completed"
+
+
 def test_complete_quiz_skips_sync_when_flag_disabled(monkeypatch):
     init_db()
     user = _create_user_with_role()
