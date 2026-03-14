@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
+
+from release_bundle import bundle_windows_artifact
 
 
 def main() -> None:
@@ -16,14 +17,9 @@ def main() -> None:
     cmd = ["flet", "pack", str(entrypoint), "--name", "TerraTesting"]
     subprocess.run(cmd, check=True)
 
-    generated_dir = Path("build")
-    if generated_dir.exists() and not any(dist_dir.iterdir()):
-        for item in generated_dir.iterdir():
-            target = dist_dir / item.name
-            if item.is_dir():
-                shutil.copytree(item, target, dirs_exist_ok=True)
-            else:
-                shutil.copy2(item, target)
+    zip_path, checksums_path = bundle_windows_artifact(build_dir=Path("build"), dist_dir=dist_dir)
+    print(f"Release asset: {zip_path}")
+    print(f"Checksums: {checksums_path}")
 
 
 if __name__ == "__main__":
