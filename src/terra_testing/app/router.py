@@ -36,7 +36,7 @@ ROUTES = {
 
 ADMIN_ROUTES = {route for route in ROUTES if route.startswith('/admin')}
 USER_ROUTES = {'/user', '/quiz', '/results', '/settings'}
-SHARED_AUTH_ROUTES = {'/reports', '/results', '/settings'}
+SHARED_AUTH_ROUTES = {'/results', '/settings'}
 
 
 def get_session_state(page: ft.Page) -> SessionState:
@@ -49,7 +49,7 @@ def route_is_allowed(route: str, state: SessionState) -> bool:
         return True
     if not state.is_authenticated:
         return False
-    if route in ADMIN_ROUTES:
+    if route in ADMIN_ROUTES or route == '/reports':
         return state.role == 'admin'
     if route in USER_ROUTES:
         if route == '/settings':

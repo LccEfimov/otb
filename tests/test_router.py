@@ -23,3 +23,14 @@ def test_regular_user_is_redirected_from_admin_route():
 def test_authenticated_user_is_redirected_from_login():
     state = SessionState(user_id=2, username='user01', role='user', is_authenticated=True)
     assert fallback_route_for_state(state, '/login') == '/user'
+
+
+def test_regular_user_cannot_open_reports_route():
+    state = SessionState(user_id=2, username='user01', role='user', is_authenticated=True)
+    assert route_is_allowed('/reports', state) is False
+    assert fallback_route_for_state(state, '/reports') == '/user'
+
+
+def test_admin_can_open_reports_route():
+    state = SessionState(user_id=1, username='admin', role='admin', is_authenticated=True)
+    assert route_is_allowed('/reports', state) is True
