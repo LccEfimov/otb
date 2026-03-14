@@ -37,6 +37,11 @@ class AuthService:
                 self.sync_service.sync_after_login(user.id)
             except Exception as exc:
                 logger.warning('Post-login sync failed for user_id=%s: %s', user.id, exc)
+                self.audit_service.log(
+                    'sync_login_failed_deferred',
+                    user.username,
+                    f'Отложенная синхронизация после входа user_id={user.id} завершилась ошибкой: {exc!r}',
+                )
 
         return {
             'success': True,

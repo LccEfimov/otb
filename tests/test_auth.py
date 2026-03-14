@@ -75,3 +75,30 @@ def test_login_calls_sync_when_flag_enabled(monkeypatch):
     result = service.login("admin", "Admin123!")
     assert result["success"] is True
     assert called["value"] is True
+
+
+def test_login_logs_audit_event_when_sync_fails(monkeypatch):
+    init_db()
+    role = _prepare_role("admin")
+    user = UserService().create_user("admin", "Admin", "Admin123!", role.id)
+
+    service = AuthService()
+    service.sync_service.settings.sync_after_login = True
+
+    def _raise_sync_error(user_id: int):
+        raise RuntimeError("sync offline")
+
+    monkeypatch.setattr(service.sync_service, "sync_after_login", _raise_sync_error)
+
+    result = service.login("admin", "Admin123!")
+
+    assert result["success"] is True
+    assert result["user_id"] == user.id
+
+    recent_events = service.audit_service.list_recent(limit=20)
+    deferred_sync_events = [event for event in recent_events if event.event_type == "sync_login_failed_deferred"]
+
+    assert deferred_sync_events
+    assert deferred_sync_events[0].actor == user.username
+    assert f"user_id={user.id}" in deferred_sync_events[0].message
+    assert "RuntimeError" in deferred_sync_events[0].message
