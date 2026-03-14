@@ -15,7 +15,7 @@ from terra_testing.utils.time import utcnow
 
 def _create_user(username: str, role_name: str = 'user'):
     with get_local_session() as session:
-        role = session.scalar(select(Role).where(Role.name == role_name))
+        role = session.query(Role).filter(Role.name == role_name).one_or_none()
         if role is None:
             role = Role(name=role_name)
             session.add(role)
